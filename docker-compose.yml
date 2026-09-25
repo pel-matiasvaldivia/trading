@@ -1,11 +1,12 @@
 # Stack de despliegue. Las imagenes NO se construyen aca: se bajan de GHCR,
 # donde las publico GitHub Actions. El VPS solo hace pull y run.
 #
-#   docker compose pull && docker compose up -d
+#   git pull && docker compose pull && docker compose up -d
 #
-# Supuesto: el VPS ya corre Nginx Proxy Manager. Los servicios no publican
-# puertos al host; se exponen en la red de NPM y este los enruta con TLS.
-# Ver deploy/README.md si en tu caso NPM es otra cosa.
+# La configuracion sale de .env, en este mismo directorio (copiar de
+# .env.example). Supuesto: el VPS ya corre Nginx Proxy Manager, que alcanza
+# al servicio 'web' por la red 'proxy'; ademas se publican puertos en el
+# host, configurables. Ver deploy/README.md.
 
 name: tradingbot
 

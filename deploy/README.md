@@ -33,19 +33,30 @@ docker network ls | grep -i proxy
 
 Suele llamarse `npm_default` o similar. Ese valor va en `PROXY_NETWORK`.
 
-**3. Configurar el entorno.**
+**3. Clonar el repo y configurar el entorno.**
+
+El `docker-compose.yml` y el `.env.example` están en la raíz del repo, así que
+el VPS se actualiza con `git pull`:
 
 ```bash
-mkdir -p /opt/tradingbot && cd /opt/tradingbot
-curl -O https://raw.githubusercontent.com/pel-matiasvaldivia/trading/main/deploy/docker-compose.yml
-curl -o .env https://raw.githubusercontent.com/pel-matiasvaldivia/trading/main/deploy/.env.example
+git clone https://github.com/pel-matiasvaldivia/trading.git /opt/tradingbot
+cd /opt/tradingbot
+cp .env.example .env
 openssl rand -hex 32   # pegar el resultado en DASHBOARD_TOKEN
 nano .env
 chmod 600 .env
 ```
 
+`.env` está en `.gitignore`, así que un `git pull` nunca lo pisa.
+
 `DASHBOARD_TOKEN` es obligatorio: sin él el compose se niega a levantar. Es la
 única barrera entre internet y tus datos de trading.
+
+Hay un solo `.env.example` y cubre las dos formas de correr el proyecto: el bot
+local y el stack Docker. Cada sección aclara cuál usa qué. La única variable
+que difiere es `TRADING_DB_PATH`, y en Docker la fija el compose
+(`/data/trading.db`, sobre el volumen), así que el valor del `.env` solo aplica
+cuando corrés el bot fuera de contenedores.
 
 ## Levantar
 
@@ -126,7 +137,17 @@ Si NPM no ve el contenedor, es que no comparten red — revisá `PROXY_NETWORK`.
 ## Actualizar
 
 ```bash
+cd /opt/tradingbot
+git pull
 docker compose pull && docker compose up -d
+```
+
+`git pull` trae los cambios del compose; `docker compose pull` trae las
+imágenes nuevas. Si sale una variable nueva en `.env.example`, compará con tu
+`.env`:
+
+```bash
+diff <(grep -oE '^[A-Z_]+=' .env.example | sort) <(grep -oE '^[A-Z_]+=' .env | sort)
 ```
 
 `IMAGE_TAG=latest` sigue a `main`. En producción conviene fijar un tag

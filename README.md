@@ -82,6 +82,39 @@ localmente. Consecuencia práctica: no hay historia profunda disponible de
 entrada, y el collector tiene que correr sostenidamente (cron, cada pocos
 minutos) antes de que un backtest tenga significancia estadística. No hay atajo.
 
+## Dashboard y landing
+
+Hay una interfaz web de solo lectura sobre el journal: landing con la tesis del
+proyecto y dashboard con cobertura de datos, curva de equity, operaciones y
+rechazos.
+
+```bash
+# Local, sin Docker
+pip install -r services/api/requirements.txt
+PYTHONPATH=src:services/api TRADING_DB_PATH=data/trading.db DASHBOARD_TOKEN=dev \
+  python -m uvicorn app.main:app --port 8000
+```
+
+El panel **observa, no opera**: monta la base con `:ro`, abre SQLite en modo
+solo lectura y no tiene acceso a las credenciales de Bitso. Solo el collector
+escribe, y solo él recibe las credenciales.
+
+## Despliegue
+
+El `docker-compose.yml` y el `.env.example` están en la raíz, así que el VPS
+clona este repo y se actualiza con `git pull`:
+
+```bash
+git clone https://github.com/pel-matiasvaldivia/trading.git /opt/tradingbot
+cd /opt/tradingbot
+cp .env.example .env    # completar DASHBOARD_TOKEN
+docker compose pull && docker compose up -d
+```
+
+Las imágenes las construye GitHub Actions y se publican en GHCR; en el VPS no
+se compila nada. Pasos completos, incluida la configuración del Proxy Host en
+Nginx Proxy Manager y los puertos publicados, en **[deploy/README.md](deploy/README.md)**.
+
 ## Arquitectura
 
 ```

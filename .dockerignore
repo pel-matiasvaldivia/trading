@@ -10,6 +10,7 @@ data
 *.sqlite
 .env
 deploy
+docker-compose.yml
 tests
 docs
 README.md
