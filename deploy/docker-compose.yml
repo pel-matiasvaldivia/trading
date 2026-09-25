@@ -38,13 +38,18 @@ services:
       - /var/cache/nginx:size=32m
       - /var/run:size=4m
       - /tmp:size=8m
-    # Sin 'ports': NPM alcanza el contenedor por la red 'proxy'.
-    # Para probar sin NPM, descomentar:
-    # ports:
-    #   - "127.0.0.1:8080:80"
+    ports:
+      # Puerto externo del servicio. NPM puede seguir alcanzando el
+      # contenedor por la red 'proxy'; esto agrega el acceso por host.
+      #
+      # WEB_BIND decide QUIEN llega: 0.0.0.0 lo publica en todas las
+      # interfaces (internet incluida, sin el TLS de NPM), 127.0.0.1 lo
+      # limita al propio VPS. Ver la nota en .env.example.
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8080}:80"
 
   # ---------------------------------------------------------------------
-  # API de lectura. No sale a la red proxy: solo la alcanza 'web'.
+  # API de lectura. No sale a la red proxy: la alcanzan 'web' y, por el
+  # puerto publicado abajo, el propio host.
   # ---------------------------------------------------------------------
   api:
     <<: *common
@@ -59,6 +64,11 @@ services:
       - trading-data:/data:ro
     networks:
       - internal
+    ports:
+      # Acceso directo a la API, sin pasar por nginx. Por defecto solo desde
+      # el propio VPS (127.0.0.1): sirve para diagnosticar con curl sin
+      # abrirla a la red. Cambiar API_BIND a 0.0.0.0 la expone de verdad.
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-8000}:8000"
     read_only: true
     tmpfs:
       - /tmp:size=16m

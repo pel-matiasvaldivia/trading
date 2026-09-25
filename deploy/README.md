@@ -56,6 +56,47 @@ docker compose ps
 docker compose logs -f collector
 ```
 
+## Puertos publicados
+
+El stack publica dos puertos en el host, ambos configurables desde `.env`:
+
+| Variable | Default | Qué es |
+|---|---|---|
+| `WEB_PORT` | `8080` | frontend; sirve también `/api` vía nginx |
+| `WEB_BIND` | `0.0.0.0` | interfaz donde se publica el frontend |
+| `API_PORT` | `8000` | API directa, sin pasar por nginx |
+| `API_BIND` | `127.0.0.1` | interfaz donde se publica la API |
+
+Con los defaults, después de `up -d`:
+
+```bash
+curl http://localhost:8080/api/health          # frontend + API
+curl http://localhost:8000/api/health          # API directa, solo desde el VPS
+```
+
+Y desde afuera, `http://IP-DEL-VPS:8080`.
+
+**Lo que hay que entender sobre `WEB_BIND=0.0.0.0`:** publica el dashboard en
+todas las interfaces, incluida la pública, **sin el TLS de NPM**. El tráfico va
+en claro y el `DASHBOARD_TOKEN` viaja en un header sin cifrar, así que
+cualquiera en el camino puede leerlo y entrar.
+
+Hay tres configuraciones sensatas, según para qué lo quieras:
+
+- **NPM al frente (recomendado).** `WEB_BIND=127.0.0.1`. NPM llega al
+  contenedor por la red Docker, no por este puerto; el puerto local queda
+  solo para diagnóstico. Tenés TLS y el token nunca viaja en claro.
+- **Acceso directo temporal, para probar.** `WEB_BIND=0.0.0.0`. Funciona ya
+  mismo, sin configurar NPM. Cerralo cuando termines.
+- **Acceso directo permanente.** `WEB_BIND=0.0.0.0` más una regla de firewall
+  que limite el puerto a tu IP (`ufw allow from TU_IP to any port 8080`).
+
+El default es `0.0.0.0` porque pediste acceso externo y así funciona sin
+configurar nada más. Si vas a usar NPM, cambialo a `127.0.0.1`.
+
+Si el puerto 8080 ya está ocupado en el VPS (`ss -lntp | grep 8080`), cambiá
+`WEB_PORT` y listo.
+
 ## Conectar Nginx Proxy Manager
 
 En la interfaz de NPM, **Proxy Hosts → Add Proxy Host**:
@@ -72,9 +113,13 @@ En la interfaz de NPM, **Proxy Hosts → Add Proxy Host**:
 En la pestaña **SSL**: pedir certificado Let's Encrypt y activar *Force SSL* y
 *HTTP/2*.
 
-Solo se publica `web`. La API y el collector quedan en la red interna y no son
-alcanzables desde afuera: el navegador llega a `/api/` porque `web` hace de
-proxy hacia adentro.
+Al usar NPM conviene poner `WEB_BIND=127.0.0.1`: NPM alcanza el contenedor por
+la red Docker, así que el puerto del host no hace falta y dejarlo abierto sería
+una puerta paralela sin TLS.
+
+El collector nunca se publica. La API se publica solo en loopback por defecto,
+para diagnóstico: el navegador llega a `/api/` porque `web` hace de proxy hacia
+adentro, no por el puerto 8000.
 
 Si NPM no ve el contenedor, es que no comparten red — revisá `PROXY_NETWORK`.
 
@@ -104,8 +149,8 @@ Tres decisiones de seguridad que vale la pena notar:
   en modo solo lectura: dos candados independientes.
 - **Todos los contenedores corren con `read_only: true`**, sin privilegios
   nuevos (`no-new-privileges`) y con usuario sin root.
-- **La API nunca se expone**. Aunque alguien adivine el token, tendría que
-  estar dentro de la red Docker.
+- **La API se publica solo en loopback** (`API_BIND=127.0.0.1`). Desde fuera
+  del VPS no es alcanzable; desde adentro sirve para diagnosticar con curl.
 
 ## Rendimiento de las imágenes
 
@@ -128,6 +173,11 @@ workflow. Si el VPS es x86, borrá esa plataforma de `.github/workflows/images.y
 ## Verificación
 
 ```bash
+# Por el puerto publicado
+curl -s http://localhost:${WEB_PORT:-8080}/api/health
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:${WEB_PORT:-8080}/api/status
+
+# Por NPM, si ya lo configuraste
 curl -s https://tu-dominio/api/health
 curl -s -H "X-API-Token: $DASHBOARD_TOKEN" https://tu-dominio/api/status
 ```
