@@ -19,9 +19,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      # Necesario para firmar la procedencia de la imagen.
-      id-token: write
-      attestations: write
 
     strategy:
       fail-fast: false
@@ -78,15 +75,10 @@ jobs:
           cache-to: |
             type=gha,mode=max,scope=${{ matrix.name }}
             type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.name }}:buildcache,mode=max
+          # buildx genera y adjunta la procedencia y el SBOM a la imagen;
+          # no hace falta un paso de atestacion aparte.
           provenance: mode=max
           sbom: true
-
-      - name: Atestacion de procedencia
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-name: ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.name }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
 
       - name: Tamano de la imagen
         run: |
