@@ -1,0 +1,25 @@
+# Credenciales: NUNCA commitear
+.env
+*.key
+*.secret
+
+# Datos locales
+data/
+*.db
+*.db-journal
+*.sqlite
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Editores
+.vscode/
+.idea/
+.DS_Store
