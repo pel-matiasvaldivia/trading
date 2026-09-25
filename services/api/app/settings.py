@@ -30,7 +30,7 @@ class ApiSettings:
             # Sin token la API queda abierta a quien alcance el contenedor.
             # El compose siempre define uno; esto es solo el fallback.
             token=os.environ.get("DASHBOARD_TOKEN") or None,
-            book=os.environ.get("TRADING_BOOK", "usdc_ars"),
+            book=os.environ.get("TRADING_BOOK", "usdt_ars"),
             starting_cash=float(os.environ.get("STARTING_CASH", "33.27")),
             cors_origins=[o.strip() for o in origins.split(",") if o.strip()],
             # Etiqueta ("1h"), la MISMA variable que usa el collector: si el

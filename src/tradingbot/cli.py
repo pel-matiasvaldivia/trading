@@ -1,9 +1,9 @@
 """Interfaz de linea de comandos.
 
     python -m tradingbot books
-    python -m tradingbot spread --book usdc_ars
-    python -m tradingbot collect --book usdc_ars
-    python -m tradingbot backtest --book usdc_ars --tf 1h --fast 10 --slow 30
+    python -m tradingbot spread --book usdt_ars
+    python -m tradingbot collect --book usdt_ars
+    python -m tradingbot backtest --book usdt_ars --tf 1h --fast 10 --slow 30
     python -m tradingbot balance
     python -m tradingbot costs
 """
@@ -254,7 +254,7 @@ def cmd_backtest(cfg: Config, args) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="tradingbot")
-    parser.add_argument("--book", default=None, help="par de mercado, ej. usdc_ars")
+    parser.add_argument("--book", default=None, help="par de mercado, ej. usdt_ars")
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("books", help="lista los pares disponibles y sus minimos")

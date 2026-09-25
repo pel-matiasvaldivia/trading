@@ -161,7 +161,7 @@ class FakeClient:
 def test_known_book_passes_verification():
     from tradingbot.daemon import verify_book
 
-    verify_book(FakeClient(["usdc_ars", "btc_ars"]), "usdc_ars")
+    verify_book(FakeClient(["usdt_ars", "btc_ars"]), "usdt_ars")
 
 
 def test_unknown_book_aborts_with_suggestions():
@@ -170,10 +170,10 @@ def test_unknown_book_aborts_with_suggestions():
     from tradingbot.daemon import verify_book
 
     with pytest.raises(SystemExit) as exc:
-        verify_book(FakeClient(["usdc_ars", "btc_mxn"]), "usdc_arss")
+        verify_book(FakeClient(["usdt_ars", "btc_mxn"]), "usdt_arss")
     message = str(exc.value)
     assert "no existe" in message
-    assert "usdc_ars" in message
+    assert "usdt_ars" in message
 
 
 def test_network_failure_does_not_abort():
@@ -181,4 +181,4 @@ def test_network_failure_does_not_abort():
     from tradingbot.daemon import verify_book
     from tradingbot.exchange.bitso import BitsoError
 
-    verify_book(FakeClient(error=BitsoError("sin red")), "usdc_ars")
+    verify_book(FakeClient(error=BitsoError("sin red")), "usdt_ars")

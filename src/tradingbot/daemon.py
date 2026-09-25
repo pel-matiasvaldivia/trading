@@ -3,8 +3,8 @@
 Es la Fase 1 del plan: sin semanas de datos reales no hay backtest con
 significancia estadistica.
 
-    python -m tradingbot.daemon --book usdc_ars --interval 60
-    python -m tradingbot.daemon --book usdc_ars --paper --tf 1h
+    python -m tradingbot.daemon --book usdt_ars --interval 60
+    python -m tradingbot.daemon --book usdt_ars --paper --tf 1h
 
 El motor de papel corre DENTRO de este proceso, despues de cada ciclo de
 recoleccion. Es deliberado: asi hay un unico escritor sobre SQLite, y las

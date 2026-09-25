@@ -81,12 +81,12 @@ Requiere acceso de red a `api.bitso.com`.
 
 ```bash
 python -m tradingbot books                      # pares y montos mínimos
-python -m tradingbot spread --book usdc_ars      # spread real, ahora
-python -m tradingbot calibrate --book usdc_ars   # medir en vez de suponer
-python -m tradingbot collect --book usdc_ars     # correr sostenido, ver abajo
-python -m tradingbot --book usdc_ars backtest --tf 1h
-python -m tradingbot --book usdc_ars paper --tf 1h     # procesa velas cerradas
-python -m tradingbot --book usdc_ars gate --tf 1h      # veredicto de la fase
+python -m tradingbot spread --book usdt_ars      # spread real, ahora
+python -m tradingbot calibrate --book usdt_ars   # medir en vez de suponer
+python -m tradingbot collect --book usdt_ars     # correr sostenido, ver abajo
+python -m tradingbot --book usdt_ars backtest --tf 1h
+python -m tradingbot --book usdt_ars paper --tf 1h     # procesa velas cerradas
+python -m tradingbot --book usdt_ars gate --tf 1h      # veredicto de la fase
 ```
 
 **Correr `calibrate` varias veces al día.** Guarda cada medición en vez de
@@ -100,7 +100,7 @@ exactamente como se construye un backtest que miente.
 cada ciclo, dentro del mismo proceso.
 
 ```bash
-python -m tradingbot.daemon --book usdc_ars --interval 60 --paper --tf 1h
+python -m tradingbot.daemon --book usdt_ars --interval 60 --paper --tf 1h
 ```
 
 Un solo proceso escribiendo en SQLite, y las velas se procesan recién cuando ya

@@ -57,7 +57,7 @@ services:
     image: ghcr.io/${GITHUB_REPOSITORY:-pel-matiasvaldivia/trading}-api:${IMAGE_TAG:-latest}
     environment:
       TRADING_DB_PATH: /data/trading.db
-      TRADING_BOOK: ${TRADING_BOOK:-usdc_ars}
+      TRADING_BOOK: ${TRADING_BOOK:-usdt_ars}
       STARTING_CASH: ${STARTING_CASH:-33.27}
       DASHBOARD_TOKEN: ${DASHBOARD_TOKEN:?definir DASHBOARD_TOKEN en .env}
       # Tienen que ser LOS MISMOS que los del collector: si no, el panel
@@ -91,12 +91,12 @@ services:
       - -m
       - tradingbot.daemon
       - --book
-      - ${TRADING_BOOK:-usdc_ars}
+      - ${TRADING_BOOK:-usdt_ars}
       - --interval
       - ${COLLECT_INTERVAL:-60}
     environment:
       TRADING_DB_PATH: /data/trading.db
-      TRADING_BOOK: ${TRADING_BOOK:-usdc_ars}
+      TRADING_BOOK: ${TRADING_BOOK:-usdt_ars}
       STARTING_CASH: ${STARTING_CASH:-33.27}
       # Fase 1: paper trading en vivo dentro de este mismo proceso, para que
       # haya un unico escritor sobre SQLite.

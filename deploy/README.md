@@ -70,7 +70,7 @@ docker compose logs -f collector
 ## Elegir el libro
 
 `TRADING_BOOK` define el par que se recolecta y sobre el que opera el motor de
-papel. El default es `usdc_ars`. **Verificalo antes de dejarlo corriendo**, que
+papel. El default es `usdt_ars`. **Verificalo antes de dejarlo corriendo**, que
 los nombres varían por país:
 
 ```bash
@@ -113,7 +113,7 @@ operaciones faltan y una estimación de cuánto hay que esperar.
 como `ESTIMADO` y el criterio de fase se evalúa contra supuestos:
 
 ```bash
-docker compose exec api python -m tradingbot calibrate --book usdc_ars
+docker compose exec api python -m tradingbot calibrate --book usdt_ars
 ```
 
 Conviene correrlo varias veces al día — el modelo usa la mediana de las
