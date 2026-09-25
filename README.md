@@ -81,12 +81,12 @@ Requiere acceso de red a `api.bitso.com`.
 
 ```bash
 python -m tradingbot books                      # pares y montos mínimos
-python -m tradingbot spread --book usd_ars      # spread real, ahora
-python -m tradingbot calibrate --book usd_ars   # medir en vez de suponer
-python -m tradingbot collect --book usd_ars     # correr sostenido, ver abajo
-python -m tradingbot --book usd_ars backtest --tf 1h
-python -m tradingbot --book usd_ars paper --tf 1h     # procesa velas cerradas
-python -m tradingbot --book usd_ars gate --tf 1h      # veredicto de la fase
+python -m tradingbot spread --book usdc_ars      # spread real, ahora
+python -m tradingbot calibrate --book usdc_ars   # medir en vez de suponer
+python -m tradingbot collect --book usdc_ars     # correr sostenido, ver abajo
+python -m tradingbot --book usdc_ars backtest --tf 1h
+python -m tradingbot --book usdc_ars paper --tf 1h     # procesa velas cerradas
+python -m tradingbot --book usdc_ars gate --tf 1h      # veredicto de la fase
 ```
 
 **Correr `calibrate` varias veces al día.** Guarda cada medición en vez de
@@ -100,7 +100,7 @@ exactamente como se construye un backtest que miente.
 cada ciclo, dentro del mismo proceso.
 
 ```bash
-python -m tradingbot.daemon --book usd_ars --interval 60 --paper --tf 1h
+python -m tradingbot.daemon --book usdc_ars --interval 60 --paper --tf 1h
 ```
 
 Un solo proceso escribiendo en SQLite, y las velas se procesan recién cuando ya
@@ -108,6 +108,17 @@ se guardaron. El motor **nunca opera la vela en formación** (sigue recibiendo
 trades, así que la señal cambiaría a medida que llegan), el estado sobrevive a
 reinicios, y el `run_id` es estable: un redeploy continúa la misma corrida en
 vez de partir la evidencia en pedazos.
+
+**Verificar el libro antes de dejarlo corriendo.** Los nombres de libro varían
+por país y cambian con el tiempo:
+
+```bash
+python -m tradingbot books | grep -i usdc
+```
+
+El daemon verifica el libro al arrancar y aborta con un error explícito si no
+existe, en vez de reintentar en silencio para siempre. Un fallo de red no
+aborta: eso lo maneja el backoff.
 
 **Sobre la historia de precios:** Bitso v3 no expone un endpoint público
 documentado de velas OHLCV. `collect` baja los trades públicos y arma las velas

@@ -67,6 +67,22 @@ docker compose ps
 docker compose logs -f collector
 ```
 
+## Elegir el libro
+
+`TRADING_BOOK` define el par que se recolecta y sobre el que opera el motor de
+papel. El default es `usdc_ars`. **Verificalo antes de dejarlo corriendo**, que
+los nombres varían por país:
+
+```bash
+docker compose exec api python -m tradingbot books | grep -i usdc
+```
+
+El collector verifica el libro al arrancar y aborta con un error explícito si
+no existe. Si cambiás de libro, tené en cuenta dos cosas: los datos del libro
+anterior quedan en la base (no molestan, pero tampoco se usan), y el `run_id`
+del motor de papel incluye el libro, así que empieza una corrida nueva desde
+cero — el contador de operaciones del criterio de fase vuelve a arrancar.
+
 ## Fase 1: paper trading
 
 El collector corre el motor de papel después de cada ciclo de recolección,
@@ -97,7 +113,7 @@ operaciones faltan y una estimación de cuánto hay que esperar.
 como `ESTIMADO` y el criterio de fase se evalúa contra supuestos:
 
 ```bash
-docker compose exec api python -m tradingbot calibrate --book usd_ars
+docker compose exec api python -m tradingbot calibrate --book usdc_ars
 ```
 
 Conviene correrlo varias veces al día — el modelo usa la mediana de las

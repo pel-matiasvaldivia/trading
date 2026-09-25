@@ -37,7 +37,7 @@ class Credentials:
 
 @dataclass(frozen=True)
 class Config:
-    book: str = "usd_ars"
+    book: str = "usdc_ars"
     db_path: Path = DEFAULT_DB_PATH
     costs: CostModel = field(default_factory=CostModel)
     credentials: Credentials = field(default_factory=Credentials.from_env)

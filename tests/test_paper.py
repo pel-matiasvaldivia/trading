@@ -143,3 +143,42 @@ def test_flat_market_produces_no_trades(store):
     store.upsert_candles("usd_ars", TF, flat)
     result = engine(store).step(now=40 * TF)
     assert result.fills == 0
+
+
+# --- verificacion del libro ------------------------------------------------
+
+class FakeClient:
+    def __init__(self, books=None, error=None):
+        self._books = books or []
+        self._error = error
+
+    def available_books(self):
+        if self._error:
+            raise self._error
+        return [{"book": b} for b in self._books]
+
+
+def test_known_book_passes_verification():
+    from tradingbot.daemon import verify_book
+
+    verify_book(FakeClient(["usdc_ars", "btc_ars"]), "usdc_ars")
+
+
+def test_unknown_book_aborts_with_suggestions():
+    """Un libro mal escrito debe fallar como error de configuracion, no
+    convertirse en un proceso que parece vivo y nunca junta un dato."""
+    from tradingbot.daemon import verify_book
+
+    with pytest.raises(SystemExit) as exc:
+        verify_book(FakeClient(["usdc_ars", "btc_mxn"]), "usdc_arss")
+    message = str(exc.value)
+    assert "no existe" in message
+    assert "usdc_ars" in message
+
+
+def test_network_failure_does_not_abort():
+    """Un fallo de red es transitorio: lo maneja el backoff del ciclo."""
+    from tradingbot.daemon import verify_book
+    from tradingbot.exchange.bitso import BitsoError
+
+    verify_book(FakeClient(error=BitsoError("sin red")), "usdc_ars")

@@ -3,8 +3,8 @@
 Es la Fase 1 del plan: sin semanas de datos reales no hay backtest con
 significancia estadistica.
 
-    python -m tradingbot.daemon --book usd_ars --interval 60
-    python -m tradingbot.daemon --book usd_ars --paper --tf 1h
+    python -m tradingbot.daemon --book usdc_ars --interval 60
+    python -m tradingbot.daemon --book usdc_ars --paper --tf 1h
 
 El motor de papel corre DENTRO de este proceso, despues de cada ciclo de
 recoleccion. Es deliberado: asi hay un unico escritor sobre SQLite, y las
@@ -43,6 +43,34 @@ def _handle_signal(signum, frame) -> None:
     global _stop
     log.info("senal %s recibida, cerrando tras el ciclo actual", signum)
     _stop = True
+
+
+def verify_book(client: BitsoClient, book: str) -> None:
+    """Falla temprano y fuerte si el libro no existe en el exchange.
+
+    Sin esto, un nombre de libro mal escrito produce un BitsoError por ciclo
+    y el backoff lo convierte en un proceso que parece vivo pero nunca junta
+    un solo dato. Un error de configuracion tiene que verse como tal.
+
+    Si la consulta falla por red, NO se aborta: eso es un problema transitorio
+    y el backoff del ciclo principal ya lo maneja.
+    """
+    try:
+        available = [b["book"] for b in client.available_books()]
+    except BitsoError as exc:
+        log.warning("no se pudo verificar el libro %s (%s); se sigue igual", book, exc)
+        return
+
+    if book in available:
+        return
+
+    parts = set(book.split("_"))
+    similar = [b for b in available if parts & set(b.split("_"))]
+    raise SystemExit(
+        f"El libro '{book}' no existe en Bitso.\n"
+        f"Libros parecidos: {', '.join(sorted(similar)) or 'ninguno'}\n"
+        f"Ver la lista completa con: python -m tradingbot books"
+    )
 
 
 def build_engine(store: Store, cfg: Config, book: str, tf: int, fast: int, slow: int) -> PaperEngine:
@@ -86,6 +114,7 @@ def run(
 ) -> int:
     cfg = Config.from_env(book=book)
     client = BitsoClient(cfg.credentials)
+    verify_book(client, book)
     backoff = interval
 
     with Store(cfg.db_path) as store:
