@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tradingbot</title>
+<meta name="description" content="Laboratorio de trading algoritmico con contabilidad de costos honesta.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📉</text></svg>">
+<link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="brand">tradingbot <span>· lab</span></div>
+    <nav>
+      <button class="btn" id="theme-toggle" type="button" aria-label="Cambiar tema">Tema</button>
+      <a class="btn btn-primary" href="/dashboard.html">Dashboard</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div class="eyebrow">Fase 0 de 3 · no opera con dinero real</div>
+    <h1>Con capital chico, los costos deciden el resultado.</h1>
+    <p>
+      Este es un laboratorio de trading algoritmico construido alrededor de esa
+      restriccion. Mide comisiones, spread y slippage en cada operacion, y
+      registra cada decision — incluidos los rechazos.
+    </p>
+    <p>
+      El objetivo no es hacer crecer 33 dolares. Es construir y validar el
+      sistema, medido honestamente, para que tenga sentido el dia que el capital
+      justifique operarlo.
+    </p>
+    <div class="actions">
+      <a class="btn btn-primary" href="/dashboard.html">Ver el dashboard</a>
+      <a class="btn" href="/api/docs">API</a>
+    </div>
+  </div>
+
+  <section>
+    <h2>La matematica que enmarca todo</h2>
+    <p class="lede">
+      Con un costo de ida y vuelta de 1.60%, operar seguido es una forma lenta
+      de donarle el capital al exchange.
+    </p>
+    <div class="grid grid-4">
+      <div class="stat">
+        <div class="label">Costo ida y vuelta</div>
+        <div class="value">1.60 %</div>
+        <div class="sub">fee + spread + slippage</div>
+      </div>
+      <div class="stat">
+        <div class="label">Por operacion</div>
+        <div class="value">0.53</div>
+        <div class="sub">sobre 33.27 de capital</div>
+      </div>
+      <div class="stat">
+        <div class="label">10 ops / mes</div>
+        <div class="value neg">−16.0 %</div>
+        <div class="sub">del capital, solo en costos</div>
+      </div>
+      <div class="stat">
+        <div class="label">Umbral minimo</div>
+        <div class="value">1.60 %</div>
+        <div class="sub">para empatar, por operacion</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Como esta construido</h2>
+    <p class="lede">Cada capa tiene una sola responsabilidad y un limite claro.</p>
+    <div class="grid grid-3">
+      <div class="card">
+        <h3>Estrategia = funcion pura</h3>
+        <p>Recibe velas, devuelve senal. Sin estado, sin red, sin conocer el
+           capital. Elimina el look-ahead bias por construccion.</p>
+      </div>
+      <div class="card">
+        <h3>Riesgo con veto duro</h3>
+        <p>Limites de exposicion, nocional minimo y kill switch diario que no
+           se rearma solo. Un bug de la estrategia no puede vaciar la cuenta.</p>
+      </div>
+      <div class="card">
+        <h3>Papel y vivo comparten codigo</h3>
+        <p>Lo unico que cambia entre ambos es <span class="mono">execute()</span>.
+           Lo validado en papel es literalmente lo que corre con plata real.</p>
+      </div>
+      <div class="card">
+        <h3>Journal de todo</h3>
+        <p>Cada senal, orden, fill y rechazo queda registrado. Un rechazo
+           silencioso es un backtest que miente.</p>
+      </div>
+      <div class="card">
+        <h3>Solo lectura contra Bitso</h3>
+        <p>El cliente no implementa colocacion de ordenes ni retiros. La API key
+           se crea con permisos de lectura; retiros, nunca.</p>
+      </div>
+      <div class="card">
+        <h3>Sin dependencias en el core</h3>
+        <p>Biblioteca estandar de Python. La capa web agrega FastAPI; el motor
+           corre en cualquier lado sin instalar nada.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>El plan</h2>
+    <p class="lede">
+      El criterio para avanzar de fase es explicito. Si no se cumple, no se avanza.
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Fase</th><th>Que</th><th>Criterio de salida</th><th>Estado</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="num">0</td><td>Infraestructura, backtest con costos, journal</td>
+              <td>pipeline probado de punta a punta</td>
+              <td><span class="status status-good"><span class="dot"></span><span class="icon">✓</span>listo</span></td></tr>
+          <tr><td class="num">1</td><td>Recoleccion sostenida + paper trading</td>
+              <td>expectancy positiva neta sobre ≥100 trades</td>
+              <td><span class="status status-warning"><span class="dot"></span><span class="icon">▸</span>en curso</span></td></tr>
+          <tr><td class="num">2</td><td>Capital real minimo, una estrategia</td>
+              <td>ejecucion real coincide con el backtest</td>
+              <td><span class="status status-critical"><span class="dot"></span><span class="icon">✕</span>bloqueada</span></td></tr>
+          <tr><td class="num">3</td><td>Escalar por aportes mensuales</td>
+              <td>—</td>
+              <td><span class="status"><span class="dot" style="background:var(--muted)"></span>pendiente</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">
+      <strong>No es asesoramiento financiero.</strong> Operar criptomonedas puede
+      resultar en la perdida total del capital. Este software sirve para aprender
+      y medir, no para prometer rendimientos.
+    </div>
+  </section>
+
+  <footer>
+    tradingbot · Fase 0 · el capital crece por aportes; el sistema crece por evidencia.
+  </footer>
+</div>
+<script src="/assets/theme.js"></script>
+</body>
+</html>

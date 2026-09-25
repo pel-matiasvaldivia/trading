@@ -1,0 +1,105 @@
+# Stack de despliegue. Las imagenes NO se construyen aca: se bajan de GHCR,
+# donde las publico GitHub Actions. El VPS solo hace pull y run.
+#
+#   docker compose pull && docker compose up -d
+#
+# Supuesto: el VPS ya corre Nginx Proxy Manager. Los servicios no publican
+# puertos al host; se exponen en la red de NPM y este los enruta con TLS.
+# Ver deploy/README.md si en tu caso NPM es otra cosa.
+
+name: tradingbot
+
+x-common: &common
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  # ---------------------------------------------------------------------
+  # Landing + dashboard. Unico servicio visible para NPM: tambien hace de
+  # reverse proxy hacia la API, asi el navegador ve un solo origen.
+  # ---------------------------------------------------------------------
+  web:
+    <<: *common
+    image: ghcr.io/${GITHUB_REPOSITORY:-pel-matiasvaldivia/trading}-web:${IMAGE_TAG:-latest}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - internal
+      - proxy
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=32m
+      - /var/run:size=4m
+      - /tmp:size=8m
+    # Sin 'ports': NPM alcanza el contenedor por la red 'proxy'.
+    # Para probar sin NPM, descomentar:
+    # ports:
+    #   - "127.0.0.1:8080:80"
+
+  # ---------------------------------------------------------------------
+  # API de lectura. No sale a la red proxy: solo la alcanza 'web'.
+  # ---------------------------------------------------------------------
+  api:
+    <<: *common
+    image: ghcr.io/${GITHUB_REPOSITORY:-pel-matiasvaldivia/trading}-api:${IMAGE_TAG:-latest}
+    environment:
+      TRADING_DB_PATH: /data/trading.db
+      TRADING_BOOK: ${TRADING_BOOK:-usd_ars}
+      STARTING_CASH: ${STARTING_CASH:-33.27}
+      DASHBOARD_TOKEN: ${DASHBOARD_TOKEN:?definir DASHBOARD_TOKEN en .env}
+    volumes:
+      # Solo lectura tambien a nivel de Docker: el panel no escribe.
+      - trading-data:/data:ro
+    networks:
+      - internal
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+
+  # ---------------------------------------------------------------------
+  # Collector: acumula datos de mercado. Es el unico que escribe en el
+  # volumen, y el unico que necesita las credenciales de Bitso.
+  # ---------------------------------------------------------------------
+  collector:
+    <<: *common
+    image: ghcr.io/${GITHUB_REPOSITORY:-pel-matiasvaldivia/trading}-api:${IMAGE_TAG:-latest}
+    command:
+      - python
+      - -m
+      - tradingbot.daemon
+      - --book
+      - ${TRADING_BOOK:-usd_ars}
+      - --interval
+      - ${COLLECT_INTERVAL:-60}
+    environment:
+      TRADING_DB_PATH: /data/trading.db
+      TRADING_BOOK: ${TRADING_BOOK:-usd_ars}
+      # Credenciales de SOLO LECTURA. Sin permiso de trading ni de retiro.
+      # El collector funciona sin ellas: los endpoints de mercado son publicos.
+      BITSO_API_KEY: ${BITSO_API_KEY:-}
+      BITSO_API_SECRET: ${BITSO_API_SECRET:-}
+    volumes:
+      - trading-data:/data
+    networks:
+      - internal
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+
+volumes:
+  trading-data:
+
+networks:
+  internal:
+    driver: bridge
+  proxy:
+    # Red que ya usa Nginx Proxy Manager. Debe existir de antes.
+    external: true
+    name: ${PROXY_NETWORK:-npm_default}

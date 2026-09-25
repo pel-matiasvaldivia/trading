@@ -1,0 +1,28 @@
+# syntax=docker/dockerfile:1.7
+#
+# Landing + dashboard servidos por nginx. Sin bundler y sin framework: los
+# assets son los archivos fuente, asi que no hay build que optimizar, solo
+# bytes que no enviar.
+
+# --- Etapa 1: precompresion ------------------------------------------------
+# Comprimir en build y servir con gzip_static evita gastar CPU del VPS
+# comprimiendo el mismo archivo en cada request.
+FROM alpine:3.21 AS assets
+RUN apk add --no-cache gzip brotli
+COPY services/web/public /public
+RUN find /public -type f \( -name '*.html' -o -name '*.css' -o -name '*.js' \
+      -o -name '*.json' -o -name '*.svg' \) -exec sh -c '\
+        gzip -9 -k -f "$1"; brotli -q 11 -f -k "$1"' _ {} \;
+
+# --- Etapa 2: runtime ------------------------------------------------------
+FROM nginx:1.27-alpine AS runtime
+
+RUN rm -rf /usr/share/nginx/html/*
+COPY --from=assets /public /usr/share/nginx/html
+COPY services/web/nginx.conf /etc/nginx/conf.d/default.conf
+
+# nginx:alpine ya trae el usuario nginx y un entrypoint que ajusta permisos.
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=4s --start-period=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1/healthz >/dev/null || exit 1

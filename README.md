@@ -92,6 +92,9 @@ risk       →  veto duro, kill switch           risk.py
 broker     →  paper | live, misma interfaz     broker/
 backtest   →  orquesta el pipeline             backtest.py
 metrics    →  desempeño, siempre neto          metrics.py
+
+api        →  lectura del journal (FastAPI)     services/api/
+web        →  landing + dashboard (nginx)       services/web/
 ```
 
 Cuatro decisiones que valen la pena explicar:

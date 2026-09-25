@@ -1,0 +1,56 @@
+# syntax=docker/dockerfile:1.7
+#
+# Imagen Python unica para dos servicios: la API y el collector. Comparten el
+# core del bot, asi que comparten capas: una sola build, una sola descarga en
+# el VPS, y el cache del registry se aprovecha dos veces.
+
+# --- Etapa 1: dependencias -------------------------------------------------
+FROM python:3.11-slim-bookworm AS builder
+
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /build
+
+# Las dependencias se instalan antes de copiar el codigo: cambiar una linea
+# de Python no invalida esta capa.
+COPY services/api/requirements.txt ./requirements.txt
+RUN python -m venv /opt/venv \
+ && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# --- Etapa 2: runtime ------------------------------------------------------
+FROM python:3.11-slim-bookworm AS runtime
+
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH="/app/src:/app/api" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    TRADING_DB_PATH=/data/trading.db
+
+# Usuario sin privilegios: el contenedor no necesita root para nada.
+RUN groupadd --system --gid 10001 bot \
+ && useradd --system --uid 10001 --gid bot --no-create-home bot \
+ && mkdir -p /data && chown bot:bot /data
+
+COPY --from=builder /opt/venv /opt/venv
+
+WORKDIR /app
+COPY --chown=bot:bot src/ /app/src/
+COPY --chown=bot:bot services/api/app/ /app/api/app/
+
+# Bytecode precompilado en la imagen: el arranque no paga la compilacion, y
+# como el filesystem va montado read-only tampoco podria escribirlo despues.
+RUN python -m compileall -q /app/src /app/api /opt/venv/lib || true
+
+USER bot
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=4).status==200 else 1)"
+
+# uvloop y httptools vienen con uvicorn[standard] y son el camino rapido.
+CMD ["uvicorn", "app.main:app", \
+     "--host", "0.0.0.0", "--port", "8000", \
+     "--loop", "uvloop", "--http", "httptools", \
+     "--no-server-header", "--access-log"]

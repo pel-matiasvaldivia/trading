@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · tradingbot</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📉</text></svg>">
+<link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="brand"><a href="/" style="color:inherit;text-decoration:none">tradingbot</a> <span>· dashboard</span></div>
+    <nav>
+      <span id="conn" class="status status-warning">
+        <span class="dot"></span><span class="icon">▸</span><span id="conn-text">conectando…</span>
+      </span>
+      <button class="btn" id="theme-toggle" type="button">Tema</button>
+    </nav>
+  </header>
+
+  <!-- Pantalla de token -->
+  <section id="auth-screen" class="hidden">
+    <h2>Token de acceso</h2>
+    <p class="lede">
+      La API esta protegida por un token compartido. Se guarda solo en este
+      navegador; nunca se envia a otro lado.
+    </p>
+    <div class="field">
+      <input type="password" id="token-input" placeholder="DASHBOARD_TOKEN" autocomplete="off">
+      <button class="btn btn-primary" id="token-save" type="button">Entrar</button>
+    </div>
+    <p id="auth-error" class="hidden" style="color:var(--critical);font-size:14px"></p>
+  </section>
+
+  <main id="app" class="hidden">
+    <section>
+      <h2>Estado</h2>
+      <p class="lede" id="status-lede"></p>
+      <div class="grid grid-4">
+        <div class="stat">
+          <div class="label">Capital</div>
+          <div class="value" id="stat-capital">—</div>
+          <div class="sub" id="stat-book"></div>
+        </div>
+        <div class="stat">
+          <div class="label">Costo ida y vuelta</div>
+          <div class="value" id="stat-roundtrip">—</div>
+          <div class="sub">umbral minimo por operacion</div>
+        </div>
+        <div class="stat">
+          <div class="label">Costo por operacion</div>
+          <div class="value" id="stat-percost">—</div>
+          <div class="sub">sobre el capital actual</div>
+        </div>
+        <div class="stat">
+          <div class="label">Modo</div>
+          <div class="value" id="stat-mode" style="font-size:20px">—</div>
+          <div class="sub" id="stat-phase"></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Cobertura de datos</h2>
+      <p class="lede">
+        Cuantas velas hay por timeframe. Sin volumen suficiente, cualquier
+        backtest es anecdota, no evidencia.
+      </p>
+      <div class="chart-card">
+        <div class="chart-head">
+          <h3>Velas almacenadas por timeframe</h3>
+          <span class="hint" id="coverage-range"></span>
+        </div>
+        <figure>
+          <div id="coverage-chart"></div>
+          <figcaption id="coverage-caption"></figcaption>
+        </figure>
+        <details class="table-view">
+          <summary>Ver como tabla</summary>
+          <div class="table-scroll"><table id="coverage-table"></table></div>
+        </details>
+      </div>
+    </section>
+
+    <section>
+      <h2>Corridas</h2>
+      <p class="lede">Cada backtest registrado en el journal, con su curva de equity.</p>
+      <div class="field" style="margin-bottom:14px">
+        <label for="run-select" style="font-size:14px;color:var(--ink-2)">Corrida</label>
+        <select id="run-select" class="btn" style="min-width:280px"></select>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head">
+          <h3>Curva de equity</h3>
+          <span class="hint">pasar el cursor para ver valores</span>
+        </div>
+        <figure>
+          <div class="chart-wrap" id="equity-chart"></div>
+          <figcaption id="equity-caption"></figcaption>
+        </figure>
+        <details class="table-view">
+          <summary>Ver como tabla</summary>
+          <div class="table-scroll"><table id="equity-table"></table></div>
+        </details>
+      </div>
+    </section>
+
+    <section>
+      <h2>Operaciones</h2>
+      <p class="lede">Las mas recientes de la corrida seleccionada, con su comision.</p>
+      <div class="chart-card table-scroll">
+        <table id="fills-table"></table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Rechazos</h2>
+      <p class="lede">
+        Ordenes que riesgo o el broker no dejaron pasar. Muchos rechazos
+        significan que la estrategia pide cosas que no se pueden hacer.
+      </p>
+      <div class="chart-card table-scroll">
+        <table id="rejects-table"></table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Panel de solo lectura. No coloca ordenes ni accede a las credenciales de Bitso.
+  </footer>
+</div>
+<script src="/assets/theme.js"></script>
+<script type="module" src="/assets/app.js"></script>
+</body>
+</html>
