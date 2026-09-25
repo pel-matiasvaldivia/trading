@@ -29,20 +29,31 @@ sistema crece por evidencia.
 
 ## Estado
 
-Fase 0 de 3. El esqueleto está completo y probado con datos sintéticos. No
-opera con dinero real y no puede hacerlo: el cliente de exchange no implementa
-colocación de órdenes.
+Fase 1 de 3. No opera con dinero real y no puede hacerlo: el cliente de
+exchange no implementa colocación de órdenes.
 
 | Fase | Qué | Estado |
 |---|---|---|
 | 0 | Infraestructura, backtest con costos, journal | listo |
-| 1 | Recolección sostenida + paper trading, ≥100 trades | pendiente de datos |
+| 1 | Recolección sostenida + paper trading, ≥100 trades | **código listo, juntando datos** |
 | 2 | Capital real mínimo, una estrategia, límites duros | bloqueada por Fase 1 |
 | 3 | Escalar por aportes mensuales | — |
 
-El criterio para pasar de Fase 1 a Fase 2 es explícito: expectancy positiva
-después de costos sobre al menos 100 operaciones simuladas. Si no se cumple,
-no se pasa.
+El criterio para pasar de Fase 1 a Fase 2 es explícito y lo contesta el
+código, no el entusiasmo: **≥100 operaciones completas simuladas con
+expectancy positiva después de costos.** Si no se cumple, no se pasa.
+
+```bash
+python -m tradingbot gate --tf 1h    # veredicto de la fase
+```
+
+Sale con código 0 solo si el criterio se cumple, así que sirve en un script.
+El mismo veredicto está en el dashboard y en `GET /api/phase`.
+
+Lo que la Fase 1 bloquea no es código, es **tiempo**: hacen falta semanas de
+mercado real. El `gate` estima cuánto falta usando el ritmo observado de velas,
+no el nominal del timeframe — en un libro poco líquido no hay una vela por
+intervalo, solo donde hubo trades.
 
 ## Arranque rápido
 
@@ -74,7 +85,29 @@ python -m tradingbot spread --book usd_ars      # spread real, ahora
 python -m tradingbot calibrate --book usd_ars   # medir en vez de suponer
 python -m tradingbot collect --book usd_ars     # correr sostenido, ver abajo
 python -m tradingbot --book usd_ars backtest --tf 1h
+python -m tradingbot --book usd_ars paper --tf 1h     # procesa velas cerradas
+python -m tradingbot --book usd_ars gate --tf 1h      # veredicto de la fase
 ```
+
+**Correr `calibrate` varias veces al día.** Guarda cada medición en vez de
+pisarla y el modelo usa la *mediana* del medio spread: el spread se abre y se
+cierra durante el día, y una sola lectura puede caer justo en el mejor momento
+y subestimar el costo real. Mientras no haya mediciones, el dashboard marca los
+costos como `ESTIMADO`, porque tratar un default como si fuera dato es
+exactamente como se construye un backtest que miente.
+
+**Paper trading sostenido:** el collector corre el motor de papel después de
+cada ciclo, dentro del mismo proceso.
+
+```bash
+python -m tradingbot.daemon --book usd_ars --interval 60 --paper --tf 1h
+```
+
+Un solo proceso escribiendo en SQLite, y las velas se procesan recién cuando ya
+se guardaron. El motor **nunca opera la vela en formación** (sigue recibiendo
+trades, así que la señal cambiaría a medida que llegan), el estado sobrevive a
+reinicios, y el `run_id` es estable: un redeploy continúa la misma corrida en
+vez de partir la evidencia en pedazos.
 
 **Sobre la historia de precios:** Bitso v3 no expone un endpoint público
 documentado de velas OHLCV. `collect` baja los trades públicos y arma las velas
@@ -123,7 +156,9 @@ storage    →  SQLite: trades, velas, journal   storage.py
 strategy   →  función pura (velas) → señal     strategy/
 risk       →  veto duro, kill switch           risk.py
 broker     →  paper | live, misma interfaz     broker/
-backtest   →  orquesta el pipeline             backtest.py
+backtest   →  historia cerrada, una pasada     backtest.py
+paper      →  velas que van cerrando, en vivo  paper.py
+phase      →  criterio de salida de la fase    phase.py
 metrics    →  desempeño, siempre neto          metrics.py
 
 api        →  lectura del journal (FastAPI)     services/api/

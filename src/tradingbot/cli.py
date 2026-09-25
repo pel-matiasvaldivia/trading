@@ -14,11 +14,14 @@ import argparse
 import sys
 
 from . import backtest as backtest_mod
+from . import costs as costs_mod
+from . import phase as phase_mod
 from .collector import TIMEFRAMES, calibrate_costs, collect_once
 from .demo import sine_candles, synthetic_candles
 from .config import Config
 from .costs import CostModel
 from .exchange.bitso import BitsoClient, BitsoError
+from .paper import PaperEngine
 from .risk import RiskManager
 from .storage import Store
 from .strategy.sma_cross import BuyAndHold, SmaCross
@@ -62,12 +65,33 @@ def cmd_collect(cfg: Config, args) -> int:
 
 
 def cmd_calibrate(cfg: Config, args) -> int:
+    import time
+
     values = calibrate_costs(_client(cfg), args.book)
-    print("Valores medidos para CostModel:")
+    with Store(cfg.db_path) as store:
+        store.save_calibration(
+            book=args.book,
+            ts=int(time.time()),
+            half_spread_bps=values["half_spread_bps"],
+            maker_fee_bps=values.get("maker_fee_bps"),
+            taker_fee_bps=values.get("taker_fee_bps"),
+        )
+        samples = store.calibration_samples(args.book)
+        model, _ = costs_mod.from_samples(samples, cfg.costs)
+
+    print("Medicion de ahora:")
     for key, value in values.items():
         print(f"  {key} = {value:.2f}")
     if "taker_fee_bps" not in values:
-        print("  (comisiones reales requieren credenciales de solo lectura)")
+        print("  (las comisiones reales requieren credenciales de solo lectura)")
+
+    print(f"\nModelo efectivo con {len(samples)} muestra(s) guardadas:")
+    print(f"  medio spread (mediana)  {model.half_spread_bps:>6.1f} bps")
+    print(f"  taker                   {model.taker_fee_bps:>6.1f} bps")
+    print(f"  ida y vuelta            {model.round_trip_bps():>6.1f} bps"
+          f" = {model.breakeven_move_pct():.2f} %")
+    print("\nCorrer esto varias veces al dia: el spread se abre y se cierra, "
+          "y una sola muestra puede subestimarlo.")
     return 0
 
 
@@ -113,6 +137,78 @@ def cmd_demo(cfg: Config, args) -> int:
     print(f"{len(candles)} velas sinteticas cargadas en el libro '{book}' ({args.tf}).")
     print("ATENCION: son datos inventados. No sirven para evaluar estrategias.")
     print(f"\nProbar con:\n  python -m tradingbot --book {book} backtest --tf {args.tf}")
+    return 0
+
+
+def _strategy_and_costs(cfg: Config, store: Store, args):
+    """Estrategia configurada y costos medidos, si los hay."""
+    strategy = SmaCross(args.fast, args.slow)
+    model, calibrated = costs_mod.from_samples(
+        store.calibration_samples(args.book), cfg.costs
+    )
+    return strategy, model, calibrated
+
+
+def cmd_gate(cfg: Config, args) -> int:
+    """Responde si el criterio de salida de la fase se cumple."""
+    with Store(cfg.db_path) as store:
+        strategy, model, calibrated = _strategy_and_costs(cfg, store, args)
+        run_id = args.run_id or phase_mod.run_id_for_paper(
+            args.book, TIMEFRAMES[args.tf], strategy
+        )
+        result = phase_mod.evaluate(store, args.book, strategy, run_id=run_id)
+
+    print(f"Corrida: {result.run_id}")
+    print(f"Costos:  {'medidos' if calibrated else 'ESTIMADOS (correr calibrate)'}"
+          f" · ida y vuelta {model.breakeven_move_pct():.2f} %")
+    print()
+    print("Historia disponible por timeframe:")
+    for row in result.readiness:
+        mark = "listo" if row.ready else f"faltan {row.missing}"
+        eta = "" if row.ready else f"  ({phase_mod.humanize_eta(row.eta_seconds)})"
+        print(f"  {row.label:<4} {row.candles:>6} velas / {row.warmup} warmup"
+              f"   {mark}{eta}")
+    print()
+    print(f"Operaciones completas: {result.round_trips} de {result.required}"
+          f"  ({result.progress:.0%})")
+    if result.round_trips:
+        print(f"Expectancy por operacion: {result.expectancy:+.4f}")
+        print(f"Win rate: {result.win_rate:.1f} %")
+        print(f"Comisiones pagadas: {result.fees_paid:.4f}")
+    print()
+    print(f"VEREDICTO: {result.verdict.upper()}")
+    print(f"  {result.reason}")
+    return 0 if result.passed else 1
+
+
+def cmd_paper(cfg: Config, args) -> int:
+    """Procesa a mano las velas cerradas pendientes del motor de papel."""
+    tf = TIMEFRAMES[args.tf]
+    with Store(cfg.db_path) as store:
+        strategy, model, calibrated = _strategy_and_costs(cfg, store, args)
+        if not calibrated:
+            print("AVISO: costos estimados, no medidos. Correr 'calibrate'.",
+                  file=sys.stderr)
+        engine = PaperEngine(
+            store=store,
+            book=args.book,
+            tf=tf,
+            strategy=strategy,
+            starting_cash=cfg.starting_cash,
+            costs=model,
+            risk=RiskManager(
+                cfg.max_position_pct, cfg.max_daily_loss_pct, cfg.min_order_notional
+            ),
+        )
+        result = engine.step()
+
+    print(f"run_id: {engine.run_id}")
+    print(f"  velas procesadas   {result.processed}")
+    print(f"  operaciones        {result.fills}")
+    print(f"  rechazos           {result.rejections}")
+    print(f"  equity             {result.equity:.4f}")
+    if result.halted:
+        print("  DETENIDO por el kill switch; requiere intervencion manual.")
     return 0
 
 
@@ -180,6 +276,17 @@ def build_parser() -> argparse.ArgumentParser:
     bt.add_argument("--fast", type=int, default=10)
     bt.add_argument("--slow", type=int, default=30)
 
+    gate = sub.add_parser("gate", help="evalua el criterio de salida de la fase")
+    gate.add_argument("--tf", choices=sorted(TIMEFRAMES), default="1h")
+    gate.add_argument("--fast", type=int, default=10)
+    gate.add_argument("--slow", type=int, default=30)
+    gate.add_argument("--run-id", default=None, dest="run_id")
+
+    paper = sub.add_parser("paper", help="procesa velas cerradas en papel")
+    paper.add_argument("--tf", choices=sorted(TIMEFRAMES), default="1h")
+    paper.add_argument("--fast", type=int, default=10)
+    paper.add_argument("--slow", type=int, default=30)
+
     return parser
 
 
@@ -192,6 +299,8 @@ HANDLERS = {
     "costs": cmd_costs,
     "backtest": cmd_backtest,
     "demo": cmd_demo,
+    "gate": cmd_gate,
+    "paper": cmd_paper,
 }
 
 

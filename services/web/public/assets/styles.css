@@ -196,3 +196,43 @@ footer { border-top: 1px solid var(--border); padding: 26px 0 40px;
   min-width: 210px;
 }
 .hidden { display: none !important; }
+
+/* --- Medidor de progreso: un solo valor, un solo color --- */
+.meter {
+  height: 6px; border-radius: 3px; background: var(--grid);
+  margin-top: 10px; overflow: hidden;
+}
+.meter-fill {
+  height: 100%; background: var(--series-1); border-radius: 3px;
+  width: 0; transition: width .3s;
+}
+
+/* --- Veredicto: icono + etiqueta, el color nunca va solo --- */
+.verdict {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left-width: 3px; border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 14px 18px;
+}
+.verdict .v-icon { font-size: 15px; font-weight: 700; line-height: 1.5; }
+.verdict .v-title {
+  font-weight: 650; font-size: 14px; letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.verdict .v-reason { color: var(--ink-2); font-size: 14px; margin-top: 3px; }
+.verdict-good { border-left-color: var(--good); }
+.verdict-good .v-icon { color: var(--good); }
+.verdict-warning { border-left-color: var(--warning); }
+.verdict-warning .v-icon { color: var(--warning); }
+.verdict-critical { border-left-color: var(--critical); }
+.verdict-critical .v-icon { color: var(--critical); }
+.verdict-muted { border-left-color: var(--muted); }
+.verdict-muted .v-icon { color: var(--muted); }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; padding: 2px 8px;
+  border-radius: 999px; border: 1px solid var(--border);
+}
+.pill-ok { color: var(--success-text); }
+.pill-wait { color: var(--muted); }

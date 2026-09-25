@@ -67,6 +67,43 @@ docker compose ps
 docker compose logs -f collector
 ```
 
+## Fase 1: paper trading
+
+El collector corre el motor de papel después de cada ciclo de recolección,
+dentro del mismo proceso. Se controla por `.env`:
+
+| Variable | Default | Qué es |
+|---|---|---|
+| `PAPER_ENABLED` | `1` | `0` para solo recolectar, sin operar en papel |
+| `PAPER_TF` | `1h` | timeframe de las velas sobre las que opera |
+| `PAPER_FAST` / `PAPER_SLOW` | `10` / `30` | medias de la estrategia baseline |
+
+**Las tres últimas las lee también la API.** Si difieren entre el collector y
+la API, el dashboard evaluaría una corrida distinta de la que realmente está
+operando. El compose las pasa a ambos servicios desde el mismo `.env`, así que
+no pueden desincronizarse salvo que las edites a mano.
+
+Seguimiento:
+
+```bash
+docker compose logs -f collector                      # ciclos y fills
+docker compose exec api python -m tradingbot gate     # veredicto de la fase
+```
+
+El veredicto también está arriba de todo en el dashboard, con cuántas
+operaciones faltan y una estimación de cuánto hay que esperar.
+
+**Calibrar los costos.** Mientras no haya mediciones, el panel marca los costos
+como `ESTIMADO` y el criterio de fase se evalúa contra supuestos:
+
+```bash
+docker compose exec api python -m tradingbot calibrate --book usd_ars
+```
+
+Conviene correrlo varias veces al día — el modelo usa la mediana de las
+muestras, porque el spread se abre y se cierra y una sola lectura puede caer
+justo en el mejor momento.
+
 ## Puertos publicados
 
 El stack publica dos puertos en el host, ambos configurables desde `.env`:

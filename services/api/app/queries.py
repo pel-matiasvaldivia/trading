@@ -11,6 +11,8 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from tradingbot.models import Candle
+
 TIMEFRAMES = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400}
 
 
@@ -94,3 +96,49 @@ def rejections(conn: sqlite3.Connection, run_id: str | None = None, limit: int =
         params = (run_id,)
     sql += " ORDER BY ts DESC, id DESC LIMIT ?"
     return _rows(conn, sql, (*params, limit))
+
+
+class ReadOnlyStore:
+    """Vista de solo lectura con la interfaz minima que `phase` necesita.
+
+    `Store` abre la base para escritura y aplica el esquema al construirse,
+    asi que la API no puede usarla: monta el volumen con :ro. Esta clase
+    expone solo los dos metodos que la evaluacion de fase consume, sobre la
+    conexion de solo lectura que ya usa el resto del panel.
+    """
+
+    def __init__(self, conn: sqlite3.Connection):
+        self.conn = conn
+
+    def load_candles(self, book: str, tf: int, limit: int | None = None) -> list[Candle]:
+        rows = self.conn.execute(
+            "SELECT ts, open, high, low, close, volume FROM candles"
+            " WHERE book = ? AND tf = ? ORDER BY ts",
+            (book, tf),
+        ).fetchall()
+        return [Candle(**dict(r)) for r in rows]
+
+    def run_entries(self, run_id: str, kind: str | None = None) -> list[sqlite3.Row]:
+        sql = "SELECT * FROM journal WHERE run_id = ?"
+        params: tuple = (run_id,)
+        if kind:
+            sql += " AND kind = ?"
+            params = (run_id, kind)
+        sql += " ORDER BY ts, id"
+        return self.conn.execute(sql, params).fetchall()
+
+    def calibration_samples(self, book: str, limit: int = 50) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT ts, maker_fee_bps, taker_fee_bps, half_spread_bps"
+            " FROM calibration WHERE book = ? ORDER BY ts DESC LIMIT ?",
+            (book, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def paper_runs(conn: sqlite3.Connection) -> list[dict]:
+    """Corridas de paper trading en curso, con su estado persistido."""
+    rows = conn.execute(
+        "SELECT * FROM paper_state ORDER BY updated_ts DESC"
+    ).fetchall()
+    return [dict(r) for r in rows]

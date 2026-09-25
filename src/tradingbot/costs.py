@@ -7,7 +7,9 @@ ejecucion en este proyecto pasa por aca.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import statistics
+from dataclasses import dataclass, replace
+from typing import Sequence
 
 from .models import Side
 
@@ -61,3 +63,45 @@ class CostModel:
     def breakeven_move_pct(self, maker: bool = False) -> float:
         """Movimiento de precio necesario para empatar, en porcentaje."""
         return self.round_trip_bps(maker) / 100.0
+
+    def affordable_amount(self, cash: float, reference_price: float) -> float:
+        """Maxima cantidad comprable con `cash`, descontando spread y comision.
+
+        Dimensionar contra el precio de referencia en vez del efectivo es un
+        error silencioso: la orden sale mas cara de lo previsto y el broker la
+        rechaza sin que quede registro de por que.
+        """
+        if cash <= 0 or reference_price <= 0:
+            return 0.0
+        execution_price = self.effective_price(Side.BUY, reference_price)
+        fee_rate = self.taker_fee_bps / BPS
+        return cash / (execution_price * (1.0 + fee_rate))
+
+
+def from_samples(
+    samples: Sequence[dict], fallback: CostModel | None = None
+) -> tuple[CostModel, bool]:
+    """Arma un CostModel con los costos medidos contra el exchange real.
+
+    Devuelve `(modelo, calibrado)`. Si no hay muestras, devuelve el fallback
+    y `False`: el panel necesita distinguir "medido" de "supuesto", porque
+    confiar en un default como si fuera dato es exactamente como se construye
+    un backtest que miente.
+
+    El medio spread usa la MEDIANA de las muestras, no la ultima: el spread
+    se abre y se cierra a lo largo del dia, y una sola lectura puede caer
+    justo en el mejor momento y subestimar el costo real.
+    """
+    base = fallback or CostModel()
+    spreads = [s["half_spread_bps"] for s in samples if s.get("half_spread_bps")]
+    if not spreads:
+        return base, False
+
+    changes: dict = {"half_spread_bps": statistics.median(spreads)}
+    # Las comisiones vienen de la cuenta y no fluctuan, asi que alcanza con
+    # la lectura mas reciente que las traiga.
+    for key in ("maker_fee_bps", "taker_fee_bps"):
+        value = next((s[key] for s in samples if s.get(key) is not None), None)
+        if value is not None:
+            changes[key] = value
+    return replace(base, **changes), True

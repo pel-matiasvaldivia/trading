@@ -17,10 +17,13 @@ from fastapi.middleware.gzip import GZipMiddleware
 from . import queries
 from .settings import settings
 
-# El core del bot es la fuente de verdad del modelo de costos: la API no lo
-# reimplementa, lo importa. Duplicar esos numeros seria garantizar que el
-# panel y el bot terminen diciendo cosas distintas.
+# El core del bot es la fuente de verdad: la API no reimplementa el modelo de
+# costos ni el criterio de fase, los importa. Duplicar esa logica seria
+# garantizar que el panel y el bot terminen diciendo cosas distintas.
+from tradingbot import costs as costs_mod
+from tradingbot import phase as phase_mod
 from tradingbot.costs import CostModel
+from tradingbot.strategy.sma_cross import SmaCross
 
 app = FastAPI(
     title="tradingbot API",
@@ -72,28 +75,92 @@ def health() -> dict:
     return {"status": "ok", "db_present": settings.db_path.exists()}
 
 
+def _strategy() -> SmaCross:
+    return SmaCross(settings.fast, settings.slow)
+
+
+def _effective_costs(conn: sqlite3.Connection) -> tuple[CostModel, bool]:
+    """Costos medidos si hay calibracion; si no, los estimados."""
+    reader = queries.ReadOnlyStore(conn)
+    return costs_mod.from_samples(reader.calibration_samples(settings.book), _costs)
+
+
 @app.get("/api/status")
-def status(_: Auth) -> dict:
+def status(conn: Conn, _: Auth) -> dict:
     """Estado del sistema y los numeros que enmarcan todo lo demas."""
+    model, calibrated = _effective_costs(conn)
     return {
         "book": settings.book,
         "starting_cash": settings.starting_cash,
         # El panel es de solo lectura; que el bot opere en vivo es una
         # decision del proceso del bot, no de esta API.
         "live_trading": False,
-        "phase": 0,
+        "phase": 1,
         "costs": {
-            "taker_fee_bps": _costs.taker_fee_bps,
-            "maker_fee_bps": _costs.maker_fee_bps,
-            "half_spread_bps": _costs.half_spread_bps,
-            "slippage_bps": _costs.slippage_bps,
-            "round_trip_bps": _costs.round_trip_bps(),
-            "breakeven_move_pct": _costs.breakeven_move_pct(),
+            "taker_fee_bps": model.taker_fee_bps,
+            "maker_fee_bps": model.maker_fee_bps,
+            "half_spread_bps": model.half_spread_bps,
+            "slippage_bps": model.slippage_bps,
+            "round_trip_bps": model.round_trip_bps(),
+            "breakeven_move_pct": model.breakeven_move_pct(),
+            # Distinguir medido de supuesto no es un detalle: tratar un
+            # default como si fuera dato es como se construye un backtest
+            # que miente.
+            "calibrated": calibrated,
         },
         "cost_per_round_trip": settings.starting_cash
-        * _costs.round_trip_bps()
+        * model.round_trip_bps()
         / 10_000,
     }
+
+
+@app.get("/api/phase")
+def phase(conn: Conn, _: Auth) -> dict:
+    """Criterio de salida de la fase: cuanto falta y cual es el veredicto."""
+    reader = queries.ReadOnlyStore(conn)
+    strategy = _strategy()
+    run_id = phase_mod.run_id_for_paper(settings.book, settings.tf, strategy)
+    result = phase_mod.evaluate(reader, settings.book, strategy, run_id=run_id)
+
+    return {
+        "run_id": result.run_id,
+        "verdict": result.verdict,
+        "reason": result.reason,
+        "passed": result.passed,
+        "round_trips": result.round_trips,
+        "required": result.required,
+        "progress": result.progress,
+        "expectancy": result.expectancy,
+        "net_pnl": result.net_pnl,
+        "fees_paid": result.fees_paid,
+        "win_rate": result.win_rate,
+        "strategy": {
+            "name": strategy.name,
+            "fast": settings.fast,
+            "slow": settings.slow,
+            "warmup": strategy.warmup,
+            "tf": settings.tf,
+        },
+        "readiness": [
+            {
+                "tf": r.tf,
+                "label": r.label,
+                "candles": r.candles,
+                "warmup": r.warmup,
+                "ready": r.ready,
+                "missing": r.missing,
+                "eta_seconds": r.eta_seconds,
+                "eta_human": phase_mod.humanize_eta(r.eta_seconds),
+            }
+            for r in result.readiness
+        ],
+    }
+
+
+@app.get("/api/paper")
+def paper(conn: Conn, _: Auth) -> list[dict]:
+    """Estado persistido de las corridas de paper trading."""
+    return queries.paper_runs(conn)
 
 
 @app.get("/api/coverage")

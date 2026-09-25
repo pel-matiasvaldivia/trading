@@ -60,6 +60,11 @@ services:
       TRADING_BOOK: ${TRADING_BOOK:-usd_ars}
       STARTING_CASH: ${STARTING_CASH:-33.27}
       DASHBOARD_TOKEN: ${DASHBOARD_TOKEN:?definir DASHBOARD_TOKEN en .env}
+      # Tienen que ser LOS MISMOS que los del collector: si no, el panel
+      # evaluaria una corrida distinta de la que esta operando en papel.
+      PAPER_TF: ${PAPER_TF:-1h}
+      PAPER_FAST: ${PAPER_FAST:-10}
+      PAPER_SLOW: ${PAPER_SLOW:-30}
     volumes:
       # Solo lectura tambien a nivel de Docker: el panel no escribe.
       - trading-data:/data:ro
@@ -92,6 +97,13 @@ services:
     environment:
       TRADING_DB_PATH: /data/trading.db
       TRADING_BOOK: ${TRADING_BOOK:-usd_ars}
+      STARTING_CASH: ${STARTING_CASH:-33.27}
+      # Fase 1: paper trading en vivo dentro de este mismo proceso, para que
+      # haya un unico escritor sobre SQLite.
+      PAPER_ENABLED: ${PAPER_ENABLED:-1}
+      PAPER_TF: ${PAPER_TF:-1h}
+      PAPER_FAST: ${PAPER_FAST:-10}
+      PAPER_SLOW: ${PAPER_SLOW:-30}
       # Credenciales de SOLO LECTURA. Sin permiso de trading ni de retiro.
       # El collector funciona sin ellas: los endpoints de mercado son publicos.
       BITSO_API_KEY: ${BITSO_API_KEY:-}

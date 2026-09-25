@@ -39,3 +39,8 @@ jobs:
         run: |
           python -m tradingbot demo --shape sine --n 200
           python -m tradingbot --book DEMO_sine backtest --tf 1h
+          python -m tradingbot --book DEMO_sine paper --tf 1h
+          # El gate sale con codigo 1 cuando el criterio no se cumple, que es
+          # lo esperado con datos sinteticos: se verifica que corra, no que
+          # apruebe.
+          python -m tradingbot --book DEMO_sine gate --tf 1h || true

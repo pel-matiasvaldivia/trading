@@ -61,6 +61,11 @@ async function loadStatus() {
   $("stat-capital").textContent = formatNumber(status.starting_cash);
   $("stat-book").textContent = `libro ${status.book}`;
   $("stat-roundtrip").textContent = `${formatNumber(status.costs.breakeven_move_pct)} %`;
+  // Distinguir medido de supuesto: tratar un default como si fuera dato es
+  // exactamente como se construye un backtest que miente.
+  $("stat-calibrated").textContent = status.costs.calibrated
+    ? "medido contra el exchange"
+    : "ESTIMADO · correr calibrate";
   $("stat-percost").textContent = formatNumber(status.cost_per_round_trip, 3);
 
   const mode = $("stat-mode");
@@ -72,6 +77,79 @@ async function loadStatus() {
   $("status-lede").textContent =
     `Diez operaciones mensuales cuestan ${formatNumber(monthly, 1)} % del capital ` +
     `solo en comisiones, spread y slippage.`;
+}
+
+// Veredicto -> como se muestra. El color nunca viaja solo: siempre lleva
+// icono y etiqueta, que es lo que lo hace legible sin distinguir colores.
+const VERDICTS = {
+  aprobado:     { cls: "verdict-good",     icon: "\u2713", title: "Aprobado" },
+  insuficiente: { cls: "verdict-warning",  icon: "\u25b8", title: "Insuficiente" },
+  rechazado:    { cls: "verdict-critical", icon: "\u2715", title: "Rechazado" },
+  sin_datos:    { cls: "verdict-muted",    icon: "\u25cb", title: "Sin datos" },
+};
+
+async function loadPhase() {
+  const [phase, paperRuns] = await Promise.all([
+    api("/phase"),
+    api("/paper").catch(() => []),
+  ]);
+
+  const verdict = VERDICTS[phase.verdict] || VERDICTS.sin_datos;
+  $("phase-verdict").className = `verdict ${verdict.cls}`;
+  $("phase-verdict").innerHTML =
+    `<span class="v-icon">${verdict.icon}</span>` +
+    `<span><span class="v-title">${verdict.title}</span>` +
+    `<div class="v-reason">${phase.reason}</div></span>`;
+
+  $("phase-trades").textContent = `${phase.round_trips} / ${phase.required}`;
+  $("phase-meter").style.width = `${Math.round(phase.progress * 100)}%`;
+  $("phase-progress").textContent = `${Math.round(phase.progress * 100)} % del umbral`;
+
+  const expectancy = $("phase-expectancy");
+  expectancy.textContent = phase.round_trips
+    ? (phase.expectancy >= 0 ? "+" : "") + formatNumber(phase.expectancy, 4)
+    : "—";
+  expectancy.className = "value" + (
+    !phase.round_trips ? "" : phase.expectancy > 0 ? " pos" : " neg"
+  );
+
+  $("phase-winrate").textContent = phase.round_trips
+    ? `${formatNumber(phase.win_rate, 1)} %` : "—";
+  $("phase-fees").textContent = phase.round_trips
+    ? `${formatNumber(phase.fees_paid, 4)} en comisiones` : "sin operaciones aun";
+
+  const s = phase.strategy;
+  $("phase-strategy").textContent =
+    `${s.name}(${s.fast},${s.slow}) · warmup ${s.warmup} velas`;
+
+  // Estado del motor de papel
+  const run = paperRuns.find((r) => r.run_id === phase.run_id) || paperRuns[0];
+  if (run) {
+    $("paper-equity").textContent = run.halted ? "DETENIDO" : "Activo";
+    $("paper-equity").className = "value" + (run.halted ? " neg" : "");
+    $("paper-detail").textContent = run.halted
+      ? (run.halt_reason || "kill switch activado")
+      : `efectivo ${formatNumber(run.cash)} · posicion ${formatNumber(run.position, 6)}`;
+  } else {
+    $("paper-equity").textContent = "Inactivo";
+    $("paper-detail").textContent = "el collector todavia no corre con --paper";
+  }
+
+  table($("readiness-table"),
+    [
+      { label: "TF", render: (r) => r.label },
+      { label: "Velas", num: true, render: (r) => formatNumber(r.candles, 0) },
+      { label: "Warmup", num: true, render: (r) => formatNumber(r.warmup, 0) },
+      { label: "Faltan", num: true, render: (r) => r.ready ? "—" : formatNumber(r.missing, 0) },
+      { label: "Espera", render: (r) => r.ready ? "—" : r.eta_human },
+      {
+        label: "Estado",
+        render: (r) => r.ready
+          ? '<span class="pill pill-ok">\u2713 listo</span>'
+          : '<span class="pill pill-wait">juntando</span>',
+      },
+    ],
+    phase.readiness, "Sin timeframes.");
 }
 
 async function loadCoverage() {
@@ -185,7 +263,7 @@ async function boot() {
   $("app").classList.remove("hidden");
   setConnection("warning", "cargando…");
   try {
-    await Promise.all([loadStatus(), loadCoverage()]);
+    await Promise.all([loadStatus(), loadPhase(), loadCoverage()]);
     await loadRuns();
     setConnection("good", "conectado");
   } catch (error) {

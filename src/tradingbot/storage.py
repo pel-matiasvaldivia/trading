@@ -51,6 +51,38 @@ CREATE TABLE IF NOT EXISTS journal (
     detail    TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_journal_run ON journal (run_id, ts);
+
+-- Costos medidos contra el exchange real. Se guarda cada medicion en vez de
+-- pisarla: el spread varia a lo largo del dia, y una sola muestra puede ser
+-- justo el peor o el mejor momento.
+CREATE TABLE IF NOT EXISTS calibration (
+    book            TEXT    NOT NULL,
+    ts              INTEGER NOT NULL,
+    maker_fee_bps   REAL,
+    taker_fee_bps   REAL,
+    half_spread_bps REAL    NOT NULL,
+    PRIMARY KEY (book, ts)
+);
+
+-- Estado del portafolio de papel. Existe para que el paper trading sobreviva
+-- a un reinicio del contenedor: sin esto, cada deploy borraria la evidencia
+-- que la Fase 1 esta juntando.
+CREATE TABLE IF NOT EXISTS paper_state (
+    run_id        TEXT    PRIMARY KEY,
+    book          TEXT    NOT NULL,
+    tf            INTEGER NOT NULL,
+    strategy      TEXT    NOT NULL,
+    cash          REAL    NOT NULL,
+    position      REAL    NOT NULL,
+    avg_cost      REAL    NOT NULL,
+    realized_pnl  REAL    NOT NULL,
+    fees_paid     REAL    NOT NULL,
+    last_candle_ts INTEGER,
+    started_ts    INTEGER NOT NULL,
+    updated_ts    INTEGER NOT NULL,
+    halted        INTEGER NOT NULL DEFAULT 0,
+    halt_reason   TEXT
+);
 """
 
 
@@ -151,6 +183,56 @@ class Store:
             equity=equity,
             detail=fill.client_id,
         )
+
+    # --- calibracion ---
+
+    def save_calibration(
+        self,
+        book: str,
+        ts: int,
+        half_spread_bps: float,
+        maker_fee_bps: float | None = None,
+        taker_fee_bps: float | None = None,
+    ) -> None:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO calibration"
+            " (book, ts, maker_fee_bps, taker_fee_bps, half_spread_bps)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (book, ts, maker_fee_bps, taker_fee_bps, half_spread_bps),
+        )
+        self.conn.commit()
+
+    def calibration_samples(self, book: str, limit: int = 50) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT ts, maker_fee_bps, taker_fee_bps, half_spread_bps"
+            " FROM calibration WHERE book = ? ORDER BY ts DESC LIMIT ?",
+            (book, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # --- estado del paper trading ---
+
+    def save_paper_state(self, state: dict) -> None:
+        cols = list(state)
+        placeholders = ", ".join("?" for _ in cols)
+        self.conn.execute(
+            f"INSERT OR REPLACE INTO paper_state ({', '.join(cols)})"
+            f" VALUES ({placeholders})",
+            list(state.values()),
+        )
+        self.conn.commit()
+
+    def load_paper_state(self, run_id: str) -> dict | None:
+        row = self.conn.execute(
+            "SELECT * FROM paper_state WHERE run_id = ?", (run_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def paper_runs(self) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT * FROM paper_state ORDER BY updated_ts DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def run_entries(self, run_id: str, kind: str | None = None) -> list[sqlite3.Row]:
         sql = "SELECT * FROM journal WHERE run_id = ?"

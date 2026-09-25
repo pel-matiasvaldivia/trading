@@ -64,7 +64,7 @@ def run(
             # Tamano propuesto: entrar con todo el efectivo, salir con toda
             # la posicion. Riesgo lo recorta segun sus limites.
             amount = (
-                _affordable_amount(state.cash, price, costs)
+                costs.affordable_amount(state.cash, price)
                 if side is Side.BUY
                 else state.position
             )
@@ -123,20 +123,6 @@ def run(
         halted=risk.halted,
         halt_reason=risk.halt_reason,
     )
-
-
-def _affordable_amount(cash: float, reference_price: float, costs: CostModel) -> float:
-    """Maxima cantidad comprable con `cash`, ya descontando spread y comision.
-
-    Dimensionar contra el precio de referencia en vez del efectivo es un error
-    silencioso: la orden sale mas cara de lo previsto y el broker la rechaza
-    sin que el backtest registre nada.
-    """
-    if cash <= 0 or reference_price <= 0:
-        return 0.0
-    execution_price = costs.effective_price(Side.BUY, reference_price)
-    fee_rate = costs.taker_fee_bps / 10_000.0
-    return cash / (execution_price * (1.0 + fee_rate))
 
 
 def _infer_period(candles: Sequence[Candle]) -> int:

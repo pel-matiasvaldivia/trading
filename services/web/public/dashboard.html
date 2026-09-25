@@ -46,7 +46,7 @@
         <div class="stat">
           <div class="label">Costo ida y vuelta</div>
           <div class="value" id="stat-roundtrip">—</div>
-          <div class="sub">umbral minimo por operacion</div>
+          <div class="sub" id="stat-calibrated">umbral minimo por operacion</div>
         </div>
         <div class="stat">
           <div class="label">Costo por operacion</div>
@@ -58,6 +58,48 @@
           <div class="value" id="stat-mode" style="font-size:20px">—</div>
           <div class="sub" id="stat-phase"></div>
         </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Fase 1 · criterio de salida</h2>
+      <p class="lede" id="phase-lede">
+        La fase termina con evidencia, no con entusiasmo: hacen falta
+        operaciones simuladas suficientes y expectancy positiva neta de costos.
+      </p>
+
+      <div id="phase-verdict" class="verdict"></div>
+
+      <div class="grid grid-4" style="margin-top:14px">
+        <div class="stat">
+          <div class="label">Operaciones completas</div>
+          <div class="value" id="phase-trades">—</div>
+          <div class="meter"><div class="meter-fill" id="phase-meter"></div></div>
+          <div class="sub" id="phase-progress"></div>
+        </div>
+        <div class="stat">
+          <div class="label">Expectancy por operacion</div>
+          <div class="value" id="phase-expectancy">—</div>
+          <div class="sub">neta de comisiones y spread</div>
+        </div>
+        <div class="stat">
+          <div class="label">Win rate</div>
+          <div class="value" id="phase-winrate">—</div>
+          <div class="sub" id="phase-fees"></div>
+        </div>
+        <div class="stat">
+          <div class="label">Papel</div>
+          <div class="value" id="paper-equity" style="font-size:22px">—</div>
+          <div class="sub" id="paper-detail"></div>
+        </div>
+      </div>
+
+      <div class="chart-card" style="margin-top:14px">
+        <div class="chart-head">
+          <h3>Historia disponible frente al warmup</h3>
+          <span class="hint" id="phase-strategy"></span>
+        </div>
+        <div class="table-scroll"><table id="readiness-table"></table></div>
       </div>
     </section>
 
